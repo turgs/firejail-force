@@ -1,0 +1,25 @@
+#!/usr/bin/expect -f
+# This file is part of Firejail project
+# Copyright (C) 2014-2017 Firejail Authors
+# License GPL v2
+
+set timeout 10
+spawn $env(SHELL)
+match_max 100000
+
+if { $argc != 1 } {
+	puts "TESTING ERROR: argument missing"
+	puts "Usage: test-profile.exp profile_name"
+	exit
+}
+
+send -- "stty -echo\r"
+after 100
+send -- "firejail --profile=$argv echo done\r"
+expect {
+	timeout {puts "TESTING ERROR 0\n";exit}
+	"done" {puts "all fine"}
+	"no suitable echo executable found" {puts "echo not found"}
+}
+#after 100
+puts "\n"

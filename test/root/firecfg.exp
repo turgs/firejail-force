@@ -1,0 +1,80 @@
+#!/usr/bin/expect -f
+# This file is part of Firejail project
+# Copyright (C) 2014-2017 Firejail Authors
+# License GPL v2
+
+set timeout 10
+spawn $env(SHELL)
+match_max 100000
+
+send -- "firecfg\r"
+sleep 1
+
+send --  "firecfg --clean\r"
+expect {
+	timeout {puts "TESTING ERROR 0\n";exit}
+	"/usr/local/bin/firefox removed"
+}
+sleep 1
+
+send -- "stty -echo\r"
+after 100
+send -- "file /usr/local/bin/firefox; echo done\r"
+expect {
+	timeout {puts "TESTING ERROR 1\n";exit}
+	"symbolic link to /usr/bin/firejail"  {puts "TESTING ERROR 2\n";exit}
+	"done"
+}
+sleep 1
+
+send --  "firecfg\r"
+expect {
+	timeout {puts "TESTING ERROR 3\n";exit}
+	"firefox created"
+}
+sleep 1
+
+send -- "file /usr/local/bin/firefox\r"
+expect {
+	timeout {puts "TESTING ERROR 4\n";exit}
+	"symbolic link to /usr/bin/firejail"
+}
+sleep 1
+
+send -- "firecfg --list\r"
+expect {
+	timeout {puts "TESTING ERROR 5\n";exit}
+	"/usr/local/bin/firefox"
+}
+sleep 1
+
+send -- "firecfg --fix\r"
+expect {
+	timeout {puts "TESTING ERROR 6\n";exit}
+	"this option is not supported for root user"
+}
+sleep 1
+
+send -- "firecfg --fix-sound\r"
+expect {
+	timeout {puts "TESTING ERROR 7\n";exit}
+	"PulseAudio configured, please logout and login back again"
+}
+sleep 1
+
+send -- "firecfg --version\r"
+expect {
+	timeout {puts "TESTING ERROR 8\n";exit}
+	"firecfg version"
+}
+sleep 1
+
+send -- "firecfg --blablabla\r"
+expect {
+	timeout {puts "TESTING ERROR 9\n";exit}
+	"invalid command line option"
+}
+sleep 1
+
+
+puts "\nall done\n"

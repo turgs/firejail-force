@@ -1,0 +1,20 @@
+#!/usr/bin/expect -f
+# This file is part of Firejail project
+# Copyright (C) 2014-2017 Firejail Authors
+# License GPL v2
+
+set timeout 10
+spawn $env(SHELL)
+match_max 100000
+
+send -- "firejail less sysutils.sh\r"
+expect {
+	timeout {puts "TESTING ERROR 1\n";exit}
+	"MALLOC_CHECK"
+}
+expect {
+	timeout {puts "TESTING ERROR 2\n";exit}
+	"./cpio.exp"
+}
+
+puts "\nall done\n"

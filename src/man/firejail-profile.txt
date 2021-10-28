@@ -1,0 +1,608 @@
+.TH FIREJAIL-PROFILE 5 "MONTH YEAR" "VERSION" "firejail profiles man page"
+.SH NAME
+profile \- Security profile file syntax for Firejail
+
+.SH USAGE
+.TP
+firejail \-\-profile=filename.profile
+
+.SH DESCRIPTION
+Several command line options can be passed to the program using
+profile files. Firejail chooses the profile file as follows:
+
+\fB1.\fR If a profile file is provided by the user with \-\-profile option, the profile file is loaded.
+Example:
+.PP
+.RS
+$ firejail --profile=/home/netblue/icecat.profile icecat
+.br
+Reading profile /home/netblue/icecat.profile
+.br
+[...]
+.RE
+
+\fB2.\fR If a profile file with the same name as the application is present in ~/.config/firejail directory or
+in /etc/firejail, the profile is loaded. ~/.config/firejail takes precedence over /etc/firejail. Example:
+.PP
+.RS
+$ firejail icecat
+.br
+Command name #icecat#
+.br
+Found icecat profile in /home/netblue/.config/firejail directory
+.br
+Reading profile /home/netblue/.config/firejail/icecat.profile
+.br
+[...]
+.RE
+
+\fB3.\fR Use a default.profile file if the sandbox
+is started by a regular user, or a server.profile file if the sandbox
+is started by root. Firejail looks for these files in ~/.config/firejail directory, followed by /etc/firejail directory.
+To disable default profile loading, use --noprofile command option. Example:
+.PP
+.RS
+$ firejail
+.br
+Reading profile /etc/firejail/default.profile
+.br
+Parent pid 8553, child pid 8554
+.br
+Child process initialized
+.br
+[...]
+.br
+
+.br
+$ firejail \-\-noprofile
+.br
+Parent pid 8553, child pid 8554
+.br
+Child process initialized
+.br
+[...]
+.RE
+
+.SH Scripting
+Scripting commands:
+
+.TP
+\fBFile and directory names
+File and directory names containing spaces are supported. The space character ' ' should not be escaped.
+
+Example: "blacklist ~/My Virtual Machines"
+
+.TP
+\fB# this is a comment
+
+.TP
+\fBinclude other.profile
+Include other.profile file.
+
+Example: "include /etc/firejail/disable-common.inc"
+
+The file name can be prefixed with a macro such as ${HOME} or ${CFG}.
+${HOME} is expanded as user home directory, and ${CFG} is expanded as
+Firejail system configuration directory - in most cases /etc/firejail or
+/usr/local/etc/firejail.
+
+Example: "include ${HOME}/myprofiles/profile1" will load "~/myprofiles/profile1" file.
+
+Example: "include ${CFG}/firefox.profile" will load "/etc/firejail/firefox.profile" file.
+
+System configuration files in ${CFG} are overwritten during software installation.
+Persistent configuration at system level is handled in ".local" files. For every
+profile file in ${CFG} directory, the user can create a corresponding .local file
+storing modifications to the persistent configuration. Persistent .local files
+are included at the start of regular profile files.
+
+.TP
+\fBnoblacklist file_name
+If the file name matches file_name, the file will not be blacklisted in any blacklist commands that follow.
+
+Example: "noblacklist ${HOME}/.mozilla"
+
+.TP
+\fBnowhitelist file_name
+If the file name matches file_name, the file will not be whitelisted in any whitelist commands that follow.
+
+Example: "nowhitelist ~/.config"
+
+.TP
+\fBignore
+Ignore command.
+
+Example: "ignore seccomp"
+
+.TP
+\fBquiet
+Disable Firejail's output. This should be the first uncommented command in the profile file.
+
+Example: "quiet"
+
+.SH Filesystem
+These profile entries define a chroot filesystem built on top of the existing
+host filesystem. Each line describes a file element that is removed from
+the filesystem (\fBblacklist\fR), a read-only file or directory (\fBread-only\fR),
+a tmpfs mounted on top of an existing directory (\fBtmpfs\fR),
+or mount-bind a directory  or file on top of another directory or file (\fBbind\fR).
+Use \fBprivate\fR to set private mode.
+File globbing is supported, and PATH and HOME directories are searched.
+Examples:
+.TP
+\fBblacklist file_or_directory
+Blacklist directory or file. Examples:
+.br
+
+.br
+blacklist /usr/bin
+.br
+blacklist /usr/bin/gcc*
+.br
+blacklist ${PATH}/ifconfig
+.br
+blacklist ${HOME}/.ssh
+
+.TP
+\fBblacklist-nolog file_or_directory
+When --tracelog flag is set, blacklisting generates syslog messages if the sandbox tries to access the file or directory.
+blacklist-nolog command disables syslog messages for this particular file or directory. Examples:
+.br
+
+.br
+blacklist-nolog /usr/bin
+.br
+blacklist-nolog /usr/bin/gcc*
+
+.TP
+\fBbind directory1,directory2
+Mount-bind directory1 on top of directory2. This option is only available when running as root.
+.TP
+\fBbind file1,file2
+Mount-bind file1 on top of file2. This option is only available when running as root.
+.TP
+\fBdisable-mnt
+Disable /mnt, /media, /run/mount and /run/media access.
+.TP
+\fBmkdir directory
+Create a directory in user home or under /tmp before the sandbox is started.
+The directory is created if it doesn't already exist.
+.br
+
+.br
+Use this command for whitelisted directories you need to preserve
+when the sandbox is closed. Without it, the application will create the directory, and the directory
+will be deleted when the sandbox is closed. Subdirectories are recursively created. Example from
+firefox profile:
+.br
+
+.br
+mkdir ~/.mozilla
+.br
+whitelist ~/.mozilla
+.br
+mkdir ~/.cache/mozilla/firefox
+.br
+whitelist ~/.cache/mozilla/firefox
+.TP
+\fBmkfile file
+Similar to mkdir, this command creates a file in user home or under /tmp before the sandbox is started.
+The file is created if it doesn't already exist.
+.TP
+\fBnoexec file_or_directory
+Remount the file or the directory noexec, nodev and nosuid.
+.TP
+\fBoverlay
+Mount  a  filesystem  overlay  on top of the current filesystem.
+The overlay is stored in $HOME/.firejail/<PID>  directory.
+.TP
+\fBoverlay-named name
+Mount  a  filesystem  overlay  on top of the current filesystem.
+The overlay is stored in $HOME/.firejail/name  directory.
+.TP
+\fBoverlay-tmpfs
+Mount  a  filesystem  overlay  on top of the current filesystem.
+All filesystem  modifications are discarded when the sandbox is closed.
+.TP
+\fBprivate
+Mount new /root and /home/user directories in temporary
+filesystems. All modifications are discarded when the sandbox is
+closed.
+.TP
+\fBprivate directory
+Use directory as user home.
+.TP
+\fBprivate-home file,directory
+Build a new user home in a temporary
+filesystem, and copy the files and directories in the list in the
+new home. All modifications are discarded when the sandbox is
+closed.
+.TP
+\fBprivate-bin file,file
+Build a new /bin in a temporary filesystem, and copy the programs in the list.
+The same directory is also bind-mounted over /sbin, /usr/bin and /usr/sbin.
+.TP
+\fBprivate-dev
+Create a new /dev directory. Only dri, null, full, zero, tty, pts, ptmx, random, urandom, log and shm devices are available.
+.TP
+\fBprivate-etc file,directory
+Build a new /etc in a temporary
+filesystem, and copy the files and directories in the list.
+All modifications are discarded when the sandbox is closed.
+.TP
+\fBprivate-lib file,directory
+Build a new /lib directory and bring in the libraries required by the application to run.
+This feature is still under development, see man 1 firejail for some examples.
+.TP
+\fBprivate-opt file,directory
+Build a new /optin a temporary
+filesystem, and copy the files and directories in the list.
+All modifications are discarded when the sandbox is closed.
+.TP
+\fBprivate-srv file,directory
+Build a new /srv in a temporary
+filesystem, and copy the files and directories in the list.
+All modifications are discarded when the sandbox is closed.
+.TP
+\fBprivate-tmp
+Mount an empty temporary filesystem on top of /tmp directory whitelisting /tmp/.X11-unix.
+.TP
+\fBread-only file_or_directory
+Make directory or file read-only.
+.TP
+\fBread-write file_or_directory
+Make directory or file read-write.
+.TP
+\fBtmpfs directory
+Mount an empty tmpfs filesystem on top of directory. This option is available only when running the sandbox as root.
+.TP
+\fBtracelog
+Blacklist violations logged to syslog.
+.TP
+\fBwhitelist file_or_directory
+Whitelist directory or file. A temporary file system is mounted on the top directory, and the
+whitelisted files are mount-binded inside. Modifications to whitelisted files are persistent,
+everything else is discarded when the sandbox is closed. The top directory could be
+user home, /dev, /media, /mnt, /opt, /srv, /var, and /tmp.
+.br
+
+.br
+Symbolic link handling: with the exception of user home, both the link and the real file should be in
+the same top directory. For user home, both the link and the real file should be owned by the user.
+.TP
+\fBwritable-etc
+Mount /etc directory read-write.
+.TP
+\fBwritable-run-user
+Disable the default blacklisting of run/user/$UID/systemd and /run/user/$UID/gnupg.
+.TP
+\fBwritable-var
+Mount /var directory read-write.
+.TP
+\fBwritable-var-log
+Use the real /var/log directory, not a clone. By default, a tmpfs is mounted on top of /var/log
+directory, and a skeleton filesystem is created based on the original /var/log.
+
+.SH Security filters
+The following security filters are currently implemented:
+
+.TP
+\fBapparmor
+Enable AppArmor confinement.
+.TP
+\fBcaps
+Enable default Linux capabilities filter.
+.TP
+\fBcaps.drop all
+Blacklist all Linux capabilities.
+.TP
+\fBcaps.drop capability,capability,capability
+Blacklist given Linux capabilities.
+.TP
+\fBcaps.keep capability,capability,capability
+Whitelist given Linux capabilities.
+.TP
+\fBprotocol protocol1,protocol2,protocol3
+Enable protocol filter. The filter is based on seccomp and  checks the
+first argument to socket system call. Recognized values: \fBunix\fR,
+\fBinet\fR, \fBinet6\fR, \fBnetlink\fR and \fBpacket\fR.
+.TP
+\fBseccomp
+Enable seccomp filter and blacklist the syscalls in the default list. See man 1 firejail for more details.
+.TP
+\fBseccomp syscall,syscall,syscall
+Enable seccomp filter and blacklist the system calls in the list on top of default seccomp filter.
+.TP
+\fBseccomp.block-secondary
+Enable seccomp filter and filter system call architectures
+so that only the native architecture is allowed.
+.TP
+\fBseccomp.drop syscall,syscall,syscall
+Enable seccomp filter and blacklist  the system calls in the list.
+.TP
+\fBseccomp.keep syscall,syscall,syscall
+Enable seccomp filter and whitelist the system calls in the list.
+.TP
+\fBmemory-deny-write-execute
+Install a seccomp filter to block attempts to create memory mappings
+that are both writable and executable, to change mappings to be
+executable or to create executable shared memory.
+.TP
+\fBnonewprivs
+Sets the NO_NEW_PRIVS prctl.  This ensures that child processes
+cannot acquire new privileges using execve(2);  in particular,
+this means that calling a suid binary (or one with file capabilities)
+does not result in an increase of privilege.
+.TP
+\fBnoroot
+Use this command  to enable an user namespace. The namespace has only one user, the current user.
+There is no root account (uid 0) defined in the namespace.
+.TP
+\fBx11
+Enable X11 sandboxing.
+.TP
+\fBx11 none
+Blacklist /tmp/.X11-unix directory, ${HOME}/.Xauthority and file specified in ${XAUTHORITY} environment variable.
+Remove DISPLAY and XAUTHORITY environment variables.
+Stop with error message if X11 abstract socket will be accessible in jail.
+.TP
+\fBx11 xephyr
+Enable X11 sandboxing with Xephyr server.
+.TP
+\fBx11 xorg
+Enable X11 sandboxing with X11 security extension.
+.TP
+\fBx11 xpra
+Enable X11 sandboxing with Xpra server.
+.TP
+\fBx11 xvfb
+Enable X11 sandboxing with Xvfb server.
+.TP
+\fBxephyr-screen WIDTHxHEIGHT
+Set screen size for x11 xephyr. This command should be included in the profile file before x11 xephyr command.
+.br
+
+.br
+Example:
+.br
+
+.br
+xephyr-screen 640x480
+.br
+x11 xephyr
+
+
+
+.SH Resource limits, CPU affinity, Control Groups
+These profile entries define the limits on system resources (rlimits) for the processes inside the sandbox.
+The limits can be modified inside the sandbox using the regular \fBulimit\fR command. \fBcpu\fR command
+configures the CPU cores available, and \fBcgroup\fR command
+place the sandbox in an existing control group.
+
+Examples:
+
+.TP
+\fBrlimit-as 123456789012
+Set he maximum size of the process's virtual memory to 123456789012 bytes.
+.TP
+\fBrlimit-cpu 123
+Set he maximum CPU time in seconds.
+.TP
+\fBrlimit-fsize 1024
+Set the maximum file size that can be created by a process to 1024 bytes.
+.TP
+\fBrlimit-nproc 1000
+Set the maximum number of processes that can be created for the real user ID of the calling process to 1000.
+.TP
+\fBrlimit-nofile 500
+Set the maximum number of files that can be opened by a process to 500.
+.TP
+\fBrlimit-sigpending 200
+Set the maximum number of processes that can be created for the real user ID of the calling process to 200.
+.TP
+\fBcpu 0,1,2
+Use only CPU cores 0, 1 and 2.
+.TP
+\fBnice -5
+Set a nice value of -5 to all processes running inside the sandbox.
+.TP
+\fBcgroup /sys/fs/cgroup/g1/tasks
+The sandbox is placed in g1 control group.
+.TP
+\fBtimeout hh:mm:ss
+Kill the sandbox automatically after the time has elapsed. The time is specified in hours/minutes/seconds format.
+
+.SH User Environment
+.TP
+\fBallusers
+All user home directories are visible inside the sandbox. By default, only current user home directory is visible.
+
+.TP
+\fBname sandboxname
+Set sandbox name. Example:
+.br
+
+.br
+name browser
+
+.TP
+\fBenv name=value
+Set environment variable. Examples:
+.br
+
+.br
+env LD_LIBRARY_PATH=/opt/test/lib
+.br
+env CFLAGS="-W -Wall -Werror"
+
+.TP
+\fBnodvd
+Disable DVD and audio CD devices.
+.TP
+\fBnogroups
+Disable supplementary user groups
+.TP
+\fBshell none
+Run the program directly, without a shell.
+.TP
+\fBipc-namespace
+Enable IPC namespace.
+.TP
+\fBnosound
+Disable sound system.
+.TP
+\fBnotv
+Disable DVB (Digital Video Broadcasting) TV devices.
+.TP
+\fBnovideo
+Disable video devices.
+.TP
+\fBno3d
+Disable 3D hardware acceleration.
+
+.SH Networking
+Networking features available in profile files.
+
+.TP
+\fBdefaultgw address
+Use this address as default gateway in the new network namespace.
+
+.TP
+\fBdns address
+Set a DNS server for the sandbox. Up to three DNS servers can be defined.
+
+.TP
+\fBhostname name
+Set a hostname for the sandbox.
+
+.TP
+\fBhosts-file file
+Use file as /etc/hosts.
+
+.TP
+\fBip address
+Assign IP addresses to the last network interface defined by a net command. A
+default gateway is assigned by default.
+.br
+
+.br
+Example:
+.br
+net eth0
+.br
+ip 10.10.20.56
+
+.TP
+\fBip none
+No IP address and no default gateway are configured for the last interface
+defined by a net command. Use this option
+in case you intend to start an external DHCP client in the sandbox.
+.br
+
+.br
+Example:
+.br
+net eth0
+.br
+ip none
+
+.TP
+\fBip6 address
+Assign IPv6 addresses to the last network interface defined by a net command.
+.br
+
+.br
+Example:
+.br
+net eth0
+.br
+ip6 2001:0db8:0:f101::1/64
+
+.TP
+\fBiprange address,address
+Assign  an  IP address in the provided range to the last network
+interface defined by  a  net command.  A  default  gateway  is assigned by default.
+.br
+
+.br
+Example:
+.br
+
+.br
+net eth0
+.br
+iprange 192.168.1.150,192.168.1.160
+.br
+
+.TP
+\fBmac address
+Assign MAC addresses to the last network interface defined by a net command.
+
+.TP
+\fBmachine-id
+Spoof id number in /etc/machine-id file - a new random id is generated inside the sandbox.
+
+.TP
+\fBmtu number
+Assign a MTU value to the last network interface defined by a net command.
+
+
+
+.TP
+\fBnetfilter
+If a new network namespace is created, enabled default network filter.
+
+.TP
+\fBnetfilter filename
+If a new network namespace is created, enabled the network filter in filename.
+
+.TP
+\fBnet bridge_interface
+Enable a new network namespace and connect it to this bridge interface.
+Unless specified with option \-\-ip and \-\-defaultgw, an IP address and a default gateway will be assigned
+automatically to the sandbox. The IP address is verified using ARP before assignment. The address
+configured as default gateway is the bridge device IP address. Up to four \-\-net
+bridge devices can be defined. Mixing bridge and macvlan devices is allowed.
+
+.TP
+\fBnet ethernet_interface
+Enable a new network namespace and connect it
+to this ethernet interface using the standard Linux macvlan
+driver. Unless specified with option \-\-ip and \-\-defaultgw, an
+IP address and a default gateway will be assigned automatically
+to the sandbox. The IP address is verified using ARP before
+assignment. The address configured as default gateway is the
+default gateway of the host. Up to four \-\-net devices can
+be defined. Mixing bridge and macvlan devices is allowed.
+Note: wlan devices are not supported for this option.
+
+.TP
+\fBnet none
+Enable a new, unconnected network namespace. The only interface
+available in the new namespace is a new loopback interface (lo).
+Use this option to deny network access to programs that don't
+really need network access.
+
+.TP
+\fBveth-name name
+Use this name for the interface connected to the bridge for --net=bridge_interface commands,
+instead of the default one.
+
+.SH Other
+.TP
+\fBjoin-or-start sandboxname
+Join the sandbox identified by name or start a new one.
+Same as "firejail --join=sandboxname" command if sandbox with specified name exists, otherwise same as "name sandboxname".
+
+.SH FILES
+/etc/firejail/filename.profile, $HOME/.config/firejail/filename.profile
+
+.SH LICENSE
+Firejail is free software; you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation; either version 2 of the License, or (at your option) any later version.
+.PP
+Homepage: https://firejail.wordpress.com
+.SH SEE ALSO
+\&\flfirejail\fR\|(1),
+\&\flfiremon\fR\|(1),
+\&\flfirecfg\fR\|(1),
+\&\flfirejail-login\fR\|(5)
